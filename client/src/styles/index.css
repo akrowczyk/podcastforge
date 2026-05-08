@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --grain-opacity: 0.03;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #0a0a0a;
+  color: #fafafa;
+  font-family: "Inter", system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  overscroll-behavior: none;
+}
+
+/* Subtle film-grain overlay across the whole app */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+}
+
+/* Hairline scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #737373;
+}
+
+/* Selection */
+::selection {
+  background: #fafafa;
+  color: #0a0a0a;
+}
+
+/* Mono number tabular alignment */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reusable: hairline rule */
+.hairline {
+  border-color: #262626;
+}
