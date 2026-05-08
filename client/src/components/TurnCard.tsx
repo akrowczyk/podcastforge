@@ -255,9 +255,12 @@ export default function TurnCard({
       <div className="flex items-stretch">
         {/* Speaker column */}
         <button
-          onClick={onSwapSpeaker}
-          className="flex-shrink-0 w-20 flex flex-col items-center justify-center gap-1 border-r border-ink-800 hover:bg-ink-800 transition-colors"
-          title="Click to swap speaker"
+          onClick={config.mode === "two-host" ? onSwapSpeaker : undefined}
+          className={[
+            "flex-shrink-0 w-20 flex flex-col items-center justify-center gap-1 border-r border-ink-800 transition-colors",
+            config.mode === "two-host" ? "cursor-pointer hover:bg-ink-800" : "cursor-default"
+          ].join(" ")}
+          title={config.mode === "two-host" ? "Click to swap speaker" : undefined}
         >
           <div
             className={[
