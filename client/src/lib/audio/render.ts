@@ -25,6 +25,7 @@ interface RenderArgs {
 }
 
 function voiceForTurn(turn: Turn, config: ProjectConfig): string {
+  if (turn.voiceOverride) return turn.voiceOverride;
   if (turn.speaker === "A") return config.voices.A;
   if (turn.speaker === "B") return config.voices.B || config.voices.A;
   return config.voices.N || config.voices.A;

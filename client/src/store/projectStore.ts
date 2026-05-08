@@ -4,9 +4,11 @@ import type {
   LintWarning,
   ProjectConfig,
   Script,
+  Speaker,
   Turn,
   VoiceId,
 } from "@shared/types";
+import { ProjectExportSchema } from "../lib/schema";
 
 interface TurnRender {
   state: "idle" | "rendering" | "done" | "failed";
@@ -49,6 +51,22 @@ interface ProjectState {
   updateTurnText: (id: string, text: string) => void;
   replaceTurn: (id: string, turn: Turn) => void;
 
+  // P3.1: Turn management
+  insertTurn: (afterId: string | null, speaker: Speaker) => void;
+  duplicateTurn: (id: string) => void;
+  deleteTurn: (id: string) => void;
+  moveTurn: (id: string, direction: "up" | "down") => void;
+
+  // P3.2: Bulk swap
+  swapAllSpeakers: () => void;
+
+  // P3.4: Per-turn voice override
+  setTurnVoiceOverride: (id: string, voice: VoiceId | undefined) => void;
+
+  // P3.5: Export / Import
+  exportProject: () => string;
+  importProject: (json: string) => { ok: boolean; error?: string };
+
   setLintWarnings: (w: LintWarning[]) => void;
   setDebugPrompt: (p: { system: string; user: string } | null) => void;
 
@@ -75,9 +93,13 @@ const DEFAULT_CONFIG: ProjectConfig = {
   pauseSameSpeakerMs: 150,
 };
 
+function newTurnId(): string {
+  return `t${Date.now()}`;
+}
+
 export const useProject = create<ProjectState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       sourceTitle: "",
       sourceText: "",
       config: DEFAULT_CONFIG,
@@ -123,7 +145,6 @@ export const useProject = create<ProjectState>()(
           const turns: Turn[] = s.script.turns.map((t) =>
             t.id === id ? { ...turn, id } : t
           );
-          // Invalidate cached audio for this turn
           const newRenders = { ...s.turnRenders };
           delete newRenders[id];
           return {
@@ -133,6 +154,154 @@ export const useProject = create<ProjectState>()(
             finalRenderState: "idle",
           };
         }),
+
+      // P3.1 — Turn management
+
+      insertTurn: (afterId, speaker) =>
+        set((s) => {
+          if (!s.script) return {};
+          const newTurn: Turn = { id: newTurnId(), speaker, text: "" };
+          const turns = [...s.script.turns];
+          if (afterId === null) {
+            turns.unshift(newTurn);
+          } else {
+            const idx = turns.findIndex((t) => t.id === afterId);
+            turns.splice(idx + 1, 0, newTurn);
+          }
+          return {
+            script: { ...s.script, turns },
+            finalAudioUrl: null,
+            finalRenderState: "idle",
+          };
+        }),
+
+      duplicateTurn: (id) =>
+        set((s) => {
+          if (!s.script) return {};
+          const idx = s.script.turns.findIndex((t) => t.id === id);
+          if (idx === -1) return {};
+          const orig = s.script.turns[idx];
+          const dup: Turn = { ...orig, id: newTurnId() };
+          const turns = [...s.script.turns];
+          turns.splice(idx + 1, 0, dup);
+          return {
+            script: { ...s.script, turns },
+            finalAudioUrl: null,
+            finalRenderState: "idle",
+          };
+        }),
+
+      deleteTurn: (id) =>
+        set((s) => {
+          if (!s.script) return {};
+          const turns = s.script.turns.filter((t) => t.id !== id);
+          const newRenders = { ...s.turnRenders };
+          delete newRenders[id];
+          return {
+            script: { ...s.script, turns },
+            turnRenders: newRenders,
+            finalAudioUrl: null,
+            finalRenderState: "idle",
+          };
+        }),
+
+      moveTurn: (id, direction) =>
+        set((s) => {
+          if (!s.script) return {};
+          const turns = [...s.script.turns];
+          const idx = turns.findIndex((t) => t.id === id);
+          if (idx === -1) return {};
+          const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+          if (swapIdx < 0 || swapIdx >= turns.length) return {};
+          [turns[idx], turns[swapIdx]] = [turns[swapIdx], turns[idx]];
+          return {
+            script: { ...s.script, turns },
+            finalAudioUrl: null,
+            finalRenderState: "idle",
+          };
+        }),
+
+      // P3.2 — Bulk speaker swap
+
+      swapAllSpeakers: () =>
+        set((s) => {
+          if (!s.script) return {};
+          const turns = s.script.turns.map((t) => ({
+            ...t,
+            speaker: (t.speaker === "A" ? "B" : t.speaker === "B" ? "A" : t.speaker) as Speaker,
+          }));
+          return {
+            script: { ...s.script, turns },
+            turnRenders: {},  // Invalidate all caches — voices changed
+            finalAudioUrl: null,
+            finalRenderState: "idle",
+          };
+        }),
+
+      // P3.4 — Per-turn voice override
+
+      setTurnVoiceOverride: (id, voice) =>
+        set((s) => {
+          if (!s.script) return {};
+          const turns = s.script.turns.map((t) =>
+            t.id === id ? { ...t, voiceOverride: voice } : t
+          );
+          // Invalidate cached audio for this turn — voice changed
+          const newRenders = { ...s.turnRenders };
+          delete newRenders[id];
+          return {
+            script: { ...s.script, turns },
+            turnRenders: newRenders,
+            finalAudioUrl: null,
+            finalRenderState: "idle",
+          };
+        }),
+
+      // P3.5 — Export / Import
+
+      exportProject: () => {
+        const s = get();
+        return JSON.stringify(
+          {
+            _format: "podcastforge",
+            _version: "0.1.0",
+            sourceTitle: s.sourceTitle,
+            sourceText: s.sourceText,
+            config: s.config,
+            script: s.script,
+          },
+          null,
+          2
+        );
+      },
+
+      importProject: (json: string) => {
+        try {
+          const raw = JSON.parse(json);
+          const result = ProjectExportSchema.safeParse(raw);
+          if (!result.success) {
+            const msg = result.error.issues
+              .map((i: { path: PropertyKey[]; message: string }) => `${i.path.join(".")}: ${i.message}`)
+              .join("; ");
+            return { ok: false, error: `Validation failed: ${msg}` };
+          }
+          const data = result.data;
+          set({
+            sourceTitle: data.sourceTitle,
+            sourceText: data.sourceText,
+            config: data.config as ProjectConfig,
+            script: data.script as Script | null,
+            turnRenders: {},
+            finalAudioUrl: null,
+            finalRenderState: "idle",
+            lintWarnings: [],
+            debugPrompt: null,
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: `Invalid JSON: ${(e as Error).message}` };
+        }
+      },
 
       setLintWarnings: (lintWarnings) => set({ lintWarnings }),
       setDebugPrompt: (debugPrompt) => set({ debugPrompt }),

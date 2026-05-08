@@ -3,14 +3,27 @@ import { useMemo, useState } from "react";
 import { useProject } from "../store/projectStore";
 import VoicePicker from "../components/VoicePicker";
 import TurnCard from "../components/TurnCard";
-import type { LintWarning } from "@shared/types";
+import type { LintWarning, Speaker } from "@shared/types";
 
 export default function EditorScreen() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
-  const { script, config, setVoice, lintWarnings, debugPrompt } = useProject();
+  const {
+    script,
+    config,
+    setVoice,
+    lintWarnings,
+    debugPrompt,
+    insertTurn,
+    duplicateTurn,
+    deleteTurn,
+    moveTurn,
+    swapAllSpeakers,
+    exportProject,
+  } = useProject();
 
   const showDebug = searchParams.get("debug") === "1";
+  const [confirmSwap, setConfirmSwap] = useState(false);
 
   if (!script) {
     return (
@@ -45,7 +58,7 @@ export default function EditorScreen() {
     };
   }, [script]);
 
-  // Group lint warnings by turn for efficient lookup
+  // Group lint warnings by turn
   const warningsByTurn = useMemo(() => {
     const map = new Map<string, LintWarning[]>();
     for (const w of lintWarnings) {
@@ -60,7 +73,7 @@ export default function EditorScreen() {
     if (!script) return;
     const turn = script.turns.find((t) => t.id === turnId);
     if (!turn) return;
-    if (config.mode === "solo") return; // can't swap in solo
+    if (config.mode === "solo") return;
     const next = turn.speaker === "A" ? "B" : "A";
     useProject.setState((s) => ({
       script: s.script
@@ -72,6 +85,39 @@ export default function EditorScreen() {
           }
         : s.script,
     }));
+  }
+
+  function handleExport() {
+    const json = exportProject();
+    const slug = (script?.title || "project")
+      .replace(/[^\w-]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}.podcastforge.json`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 200);
+  }
+
+  function handleSwapAll() {
+    swapAllSpeakers();
+    setConfirmSwap(false);
+  }
+
+  // Figure out the default speaker for insert between turns
+  function nextSpeaker(afterId: string | null): Speaker {
+    if (config.mode === "solo") return "N";
+    if (!afterId || !script) return "A";
+    const idx = script.turns.findIndex((t) => t.id === afterId);
+    if (idx === -1) return "A";
+    return script.turns[idx].speaker === "A" ? "B" : "A";
   }
 
   return (
@@ -98,16 +144,31 @@ export default function EditorScreen() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
         {/* Turn list */}
-        <div className="space-y-2">
+        <div className="space-y-0">
+          {/* Insert at top */}
+          <InsertAffordance
+            onClick={() => insertTurn(null, nextSpeaker(null))}
+          />
+
           {script.turns.map((turn, i) => (
-            <TurnCard
-              key={turn.id}
-              turn={turn}
-              index={i}
-              allTurns={script.turns}
-              lintWarnings={warningsByTurn.get(turn.id) || []}
-              onSwapSpeaker={() => swapSpeaker(turn.id)}
-            />
+            <div key={turn.id}>
+              <TurnCard
+                turn={turn}
+                index={i}
+                allTurns={script.turns}
+                lintWarnings={warningsByTurn.get(turn.id) || []}
+                isFirst={i === 0}
+                isLast={i === script.turns.length - 1}
+                onSwapSpeaker={() => swapSpeaker(turn.id)}
+                onMove={(dir) => moveTurn(turn.id, dir)}
+                onDuplicate={() => duplicateTurn(turn.id)}
+                onDelete={() => deleteTurn(turn.id)}
+              />
+              {/* Insert between turns */}
+              <InsertAffordance
+                onClick={() => insertTurn(turn.id, nextSpeaker(turn.id))}
+              />
+            </div>
           ))}
         </div>
 
@@ -140,6 +201,40 @@ export default function EditorScreen() {
             />
           )}
 
+          {/* Bulk speaker swap (two-host only) */}
+          {config.mode === "two-host" && (
+            <div className="pt-2">
+              {confirmSwap ? (
+                <div className="border border-ink-700 bg-ink-900/60 p-3 space-y-2">
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
+                    Swap all A↔B? This will invalidate all cached audio.
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSwapAll}
+                      className="flex-1 py-1.5 bg-ink-50 text-ink-950 font-mono text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setConfirmSwap(false)}
+                      className="px-3 py-1.5 border border-ink-800 text-ink-400 font-mono text-[10px] uppercase tracking-widest hover:text-ink-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmSwap(true)}
+                  className="w-full py-2 text-[10px] font-mono uppercase tracking-widest text-ink-500 border border-ink-800 hover:text-ink-200 hover:border-ink-600 transition-colors"
+                >
+                  Swap all A↔B
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="pt-4 border-t border-ink-800 space-y-2">
             <button
               onClick={() => nav("/render")}
@@ -150,6 +245,14 @@ export default function EditorScreen() {
                 <span className="text-xl">→</span>
               </span>
             </button>
+
+            <button
+              onClick={handleExport}
+              className="w-full py-2 text-[10px] font-mono uppercase tracking-widest text-ink-500 border border-ink-800 hover:text-ink-200 hover:border-ink-600 transition-colors"
+            >
+              ↓ Export Project (.json)
+            </button>
+
             <button
               onClick={() => nav("/")}
               className="w-full text-ink-500 hover:text-ink-200 py-2 font-mono text-[10px] uppercase tracking-widest transition-colors"
@@ -180,6 +283,24 @@ function StatBlock({ label, value }: { label: string; value: string }) {
       <span className="text-ink-50 font-display font-bold tracking-tight text-xl normal-case tabular-nums">
         {value}
       </span>
+    </div>
+  );
+}
+
+function InsertAffordance({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="group/insert relative h-2 flex items-center justify-center">
+      <button
+        onClick={onClick}
+        className="absolute inset-x-0 flex items-center justify-center opacity-0 group-hover/insert:opacity-100 transition-opacity z-10"
+      >
+        <div className="flex items-center gap-2 px-3 py-0.5 bg-ink-800 hover:bg-ink-700 transition-colors">
+          <span className="text-ink-400 text-[10px] font-mono uppercase tracking-widest">
+            + Add turn
+          </span>
+        </div>
+      </button>
+      <div className="absolute inset-x-0 h-px bg-transparent group-hover/insert:bg-ink-700 transition-colors" />
     </div>
   );
 }

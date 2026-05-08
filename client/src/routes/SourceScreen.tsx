@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useProject } from "../store/projectStore";
 import { generateScriptApi } from "../lib/grokClient";
 import type {
@@ -21,9 +21,11 @@ export default function SourceScreen() {
     setScript,
     setLintWarnings,
     setDebugPrompt,
+    importProject,
   } = useProject();
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const charCount = sourceText.length;
   const canGenerate = sourceText.trim().length > 200 && !generating;
@@ -45,6 +47,29 @@ export default function SourceScreen() {
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const result = importProject(text);
+      if (!result.ok) {
+        setError(`Import failed: ${result.error}`);
+      } else {
+        setError(null);
+        // If a script exists, go straight to editor
+        const s = useProject.getState();
+        if (s.script) {
+          nav("/editor");
+        }
+      }
+    } catch (err) {
+      setError(`Import failed: ${(err as Error).message}`);
+    }
+    // Reset the file input so the same file can be re-imported
+    if (importRef.current) importRef.current.value = "";
   }
 
   return (
@@ -174,6 +199,22 @@ export default function SourceScreen() {
           </button>
           <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-600 text-center">
             grok-4.3 · ~$0.05 per generation
+          </div>
+
+          <div className="pt-3 border-t border-ink-800">
+            <input
+              ref={importRef}
+              type="file"
+              accept=".json,.podcastforge.json"
+              onChange={handleImport}
+              className="hidden"
+            />
+            <button
+              onClick={() => importRef.current?.click()}
+              className="w-full py-2 text-[10px] font-mono uppercase tracking-widest text-ink-500 border border-ink-800 hover:text-ink-200 hover:border-ink-600 transition-colors"
+            >
+              ↑ Import Project (.json)
+            </button>
           </div>
         </aside>
       </div>

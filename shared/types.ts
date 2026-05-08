@@ -31,6 +31,7 @@ export interface Turn {
   id: string;
   speaker: Speaker;
   text: string;
+  voiceOverride?: VoiceId;
 }
 
 export interface Script {
