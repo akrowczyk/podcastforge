@@ -121,3 +121,41 @@ export async function synthesize(args: {
   const contentType = res.headers.get("content-type") || "audio/mpeg";
   return { buffer, contentType };
 }
+
+// ===== Health ping (used by /api/health/deep) =====
+export async function xaiPing(): Promise<{
+  ok: boolean;
+  latencyMs: number;
+  modelsAvailable?: number;
+  error?: string;
+}> {
+  const started = Date.now();
+  try {
+    const res = await fetch(`${XAI_BASE}/models`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${getApiKey()}` },
+      signal: AbortSignal.timeout(5_000),
+    });
+    const latencyMs = Date.now() - started;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "<no body>");
+      return {
+        ok: false,
+        latencyMs,
+        error: `xAI ${res.status}: ${body.slice(0, 200)}`,
+      };
+    }
+    const data = (await res.json()) as { data?: unknown[] };
+    return {
+      ok: true,
+      latencyMs,
+      modelsAvailable: Array.isArray(data?.data) ? data.data.length : undefined,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - started,
+      error: (e as Error).message,
+    };
+  }
+}
