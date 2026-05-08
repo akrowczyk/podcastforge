@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { synthesize } from "../lib/xaiClient.js";
+import { logger } from "../lib/logger.js";
 import type { TtsRequest } from "../../../shared/types.js";
 
 export const ttsRouter = Router();
@@ -37,7 +38,7 @@ ttsRouter.post("/", async (req, res) => {
     res.send(Buffer.from(buffer));
   } catch (e) {
     const msg = (e as Error).message;
-    console.error("[tts]", msg);
+    logger.error({ err: msg, route: "/api/tts" }, "TTS failed");
     res.status(502).json({ error: "TTS failed", details: msg });
   }
 });

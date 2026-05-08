@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
 import z from "zod";
+import { logger } from "../lib/logger.js";
 
 export const fetchRouter = Router();
 
@@ -56,7 +57,10 @@ fetchRouter.post("/", async (req: Request, res: Response) => {
       title: article?.title?.trim() || "",
     });
   } catch (error) {
-    console.error("fetchUrl error:", error);
+    logger.error(
+      { err: (error as Error).message, route: "/api/fetch-url" },
+      "URL fetch failed"
+    );
     res.status(400).json({ error: (error as Error).message });
   }
 });

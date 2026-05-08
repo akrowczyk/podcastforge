@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { generateScript } from "../lib/xaiClient.js";
 import { buildRegeneratePrompt } from "../prompts/regenerate.js";
+import { logger } from "../lib/logger.js";
 import type { RegenerateTurnRequest, Speaker } from "../../../shared/types.js";
 
 export const regenerateRouter = Router();
@@ -55,7 +56,7 @@ regenerateRouter.post("/", async (req, res) => {
     });
   } catch (e) {
     const msg = (e as Error).message;
-    console.error("[regenerate-turn]", msg);
+    logger.error({ err: msg, route: "/api/regenerate-turn" }, "Turn regeneration failed");
     res.status(502).json({ error: "Turn regeneration failed", details: msg });
   }
 });
