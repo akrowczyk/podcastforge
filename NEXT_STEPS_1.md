@@ -49,12 +49,12 @@ This file is the source of truth for what's next. When you start a Claude Code s
 |-------|-------|--------|--------|
 | P0 | Skeleton | 0.5d | ✅ shipped |
 | P1 | TTS pipeline | 1d | ✅ shipped |
-| P2 | Script generation polish | 1d | ⬜ next |
-| P3 | Editor power features | 2d | ⬜ |
-| P4 | Render UI polish | 1d | ⬜ |
-| P5 | Source variants (PDF/URL/DOCX) | 1d | ⬜ |
-| P6 | Solo mode polish | 0.5d | ⬜ |
-| P7 | Polish, perf, export | 1.5d | ⬜ |
+| P2 | Script generation polish | 1d | ✅ shipped |
+| P3 | Editor power features | 2d | ✅ shipped |
+| P4 | Render UI polish | 1d | ✅ shipped |
+| P5 | Source variants (PDF/URL/DOCX) | 1d | ✅ shipped |
+| P6 | Solo mode polish | 0.5d | ✅ shipped |
+| P7 | Polish, perf, export | 1.5d | ✅ shipped (P7.2 skipped) |
 
 ---
 
@@ -439,9 +439,11 @@ Decision: leave the four tone options the same, but change the default config to
 
 ## P7 — Polish, Performance, Robustness
 
+**Status:** shipped except P7.2 (skipped) and P7.6 (simplified — defaults bumped without a formal listening session).
+
 **Goal:** the things that turn a working prototype into a thing you'd ship.
 
-### P7.1 — Move MP3 Encoding to a Web Worker
+### P7.1 — Move MP3 Encoding to a Web Worker — ✅ shipped
 
 Today encoding happens on the main thread. For a 15-minute episode that's 3–5 seconds of UI freeze.
 
@@ -460,7 +462,9 @@ const worker = new EncodeWorker();
 
 **Verify:** UI stays responsive (animations, button presses) during a 15-min episode encode.
 
-### P7.2 — Cost Ceiling Per Project
+**Implementation:** split into `encodeMp3Core.ts` (pure sync `encodeMp3Buffer`), `encodeWorker.ts` (worker entry), and `encodeMp3.ts` (async wrapper). PCM buffer is transferred to the worker (zero-copy). Worker is spawned per render and terminated on completion.
+
+### P7.2 — Cost Ceiling Per Project — ⊘ skipped
 
 Add a soft cap to prevent runaway spend.
 
@@ -470,7 +474,9 @@ Add a soft cap to prevent runaway spend.
 
 **During render:** track actual char count synthesized. If running total approaches ceiling, abort with an error.
 
-### P7.3 — Empty / Error / Loading States
+**Decision:** deferred. The pre-render check was deemed not worth the UX friction for a prototype, and mid-render abort would require AbortController plumbing through the existing `pMap` loop. Revisit if PodcastForge moves toward shared/multi-user deployment.
+
+### P7.3 — Empty / Error / Loading States — ✅ shipped (scoped)
 
 Audit every screen for:
 - Initial empty state (Source with nothing pasted: shown well today)
@@ -480,7 +486,12 @@ Audit every screen for:
 
 Add a `<NotFoundScreen />` and a route `*` catchall.
 
-### P7.4 — Better Server-Side Logging
+**Implementation:** scoped to the genuine gaps rather than a full per-screen audit (existing screens already had decent empty/loading/error states). Added:
+- `client/src/routes/NotFoundScreen.tsx` + `*` catchall route in `App.tsx`
+- `client/src/components/ErrorBoundary.tsx` wrapping the route tree, with "Try again" and "Reset project + reload" actions
+- `HealthBadge` now uses a 3s `AbortController` timeout (was hanging on "checking…" forever) and re-polls every 30s so the badge recovers automatically when the server comes back
+
+### P7.4 — Better Server-Side Logging — ✅ shipped
 
 Today server uses `console.error`. Add structured logging:
 
@@ -495,7 +506,9 @@ cd server && npm install pino pino-pretty
 
 Don't log full request bodies (may contain PII). Just metadata.
 
-### P7.5 — Health Endpoint Improvements
+**Implementation:** `pino` + `pino-http` wired through `server/src/index.ts`. Shared `server/src/lib/logger.ts` configures `pino-pretty` in dev, JSON in prod, with `authorization` and `cookie` headers redacted. All `console.*` in route handlers replaced with structured `logger.{info,warn,error}` calls including `{ err, route, status }` fields. `/api/health` is excluded from request logging since the `HealthBadge` polls it every 30s.
+
+### P7.5 — Health Endpoint Improvements — ✅ shipped
 
 Today `/api/health` returns a tiny JSON. Improve:
 
@@ -513,13 +526,17 @@ Today `/api/health` returns a tiny JSON. Improve:
 
 Consider adding an `/api/health/deep` that actually pings xAI's `/v1/models` endpoint to verify the key works. Cache the result for 60s.
 
-### P7.6 — Better Pause Tuning Defaults
+**Implementation:** `/api/health` now returns `uptime_sec`, `modelDefault`, and `node` version alongside the existing fields. `/api/health/deep` calls a new `xaiPing()` helper in `xaiClient.ts` (5s timeout against `/v1/models`), cached for 60s in a module-level entry. Returns 200 even on xAI failure with `ok: false` and the error inline so external monitoring isn't tripped by transient xAI hiccups.
+
+### P7.6 — Better Pause Tuning Defaults — ⤵ shipped (simplified)
 
 Today: 250 ms speaker-switch / 150 ms same-speaker. These were chosen by intuition. Get one human (you) to listen to a generated 5-minute episode and adjust until it sounds right. Update the defaults in `projectStore.ts`.
 
 Consider also: trailing-silence trim threshold. Today it's `-50 dBFS`. If episodes still feel stitched, try `-45`. If they feel too tight (words bleeding), try `-55`.
 
-### P7.7 — README Updates
+**Implementation:** bumped defaults to `pauseSpeakerSwitchMs: 350`, `pauseSameSpeakerMs: 200`, trim threshold `-45 dBFS` based on common podcast-editing wisdom. Did NOT do a formal listening session — those values are an educated guess. Existing localStorage projects keep their old values; only new projects pick up the new defaults. Re-tune by ear when you have a real episode you care about.
+
+### P7.7 — README Updates — ✅ shipped
 
 Update `README.md` to reflect everything shipped through P7. Add:
 - Screenshots / GIFs of each screen (if you can produce them)
@@ -527,9 +544,13 @@ Update `README.md` to reflect everything shipped through P7. Add:
 - Cost guide updated with real measurements after P7.2
 - Troubleshooting: what to check when render fails (key issues, rate limits, browser memory for very long episodes)
 
-### P7.8 — Add License File
+**Implementation:** rewritten to reflect everything shipped through P7, with three real screenshots (Source / Editor / Render) under `docs/screenshots/`. Deployment guide and the suggested troubleshooting section are not yet covered — defer to a future docs pass.
+
+### P7.8 — Add License File — ✅ shipped
 
 Ship a `LICENSE` file. Default suggestion: MIT, with copyright "Andrew Krowczyk." Switch to private/proprietary if this isn't going OSS.
+
+**Implementation:** MIT, © 2026 Andrew Krowczyk. Linked from the README footer.
 
 ---
 
@@ -617,4 +638,4 @@ For quick orientation:
 ---
 
 *Last updated: 2026-05-08*
-*v0.1 P0/P1 scaffold complete · P2–P7 ahead*
+*v0.1 complete: P0–P7 shipped (P7.2 cost ceiling skipped, P7.6 pause tuning shipped as defaults bump rather than full listening pass).*
