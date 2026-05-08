@@ -39,7 +39,7 @@ export default function EditorScreen() {
         </p>
         <button
           onClick={() => nav("/")}
-          className="bg-ink-50 text-ink-950 px-8 py-3 font-display font-bold uppercase tracking-tight hover:bg-white transition-colors"
+          className="bg-ink-50 text-ink-950 px-8 py-3 font-display font-bold uppercase tracking-tight hover:bg-ink-200 transition-colors"
         >
           ← Back to Source
         </button>
@@ -234,7 +234,7 @@ export default function EditorScreen() {
                   <div className="flex gap-2">
                     <button
                       onClick={handleSwapAll}
-                      className="flex-1 py-1.5 bg-ink-50 text-ink-950 font-mono text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors"
+                      className="flex-1 py-1.5 bg-ink-50 text-ink-950 font-mono text-[10px] uppercase tracking-widest font-bold hover:bg-ink-200 transition-colors"
                     >
                       Confirm
                     </button>
@@ -260,7 +260,7 @@ export default function EditorScreen() {
           <div className="pt-4 border-t border-ink-800 space-y-2">
             <button
               onClick={() => nav("/render")}
-              className="w-full group bg-ink-50 text-ink-950 hover:bg-white py-4 font-display font-bold tracking-tight uppercase transition-colors"
+              className="w-full group bg-ink-50 text-ink-950 hover:bg-ink-200 py-4 font-display font-bold tracking-tight uppercase transition-colors"
             >
               <span className="flex items-center justify-center gap-3">
                 Render Audio

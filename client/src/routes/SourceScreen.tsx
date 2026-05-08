@@ -153,7 +153,7 @@ export default function SourceScreen() {
                 className={[
                   "px-4 py-2 font-mono text-[10px] uppercase tracking-widest transition-colors border-b-2",
                   tab === t
-                    ? "border-ink-50 text-ink-50"
+                    ? "border-ink-50 text-ink-50 font-bold"
                     : "border-transparent text-ink-500 hover:text-ink-200"
                 ].join(" ")}
               >
@@ -342,7 +342,7 @@ export default function SourceScreen() {
           <button
             onClick={handleGenerate}
             disabled={!canGenerate}
-            className="w-full group relative overflow-hidden bg-ink-50 text-ink-950 hover:bg-white disabled:bg-ink-800 disabled:text-ink-600 disabled:cursor-not-allowed py-4 font-display font-bold tracking-tight uppercase text-base transition-all"
+            className="w-full group relative overflow-hidden bg-ink-50 text-ink-950 hover:bg-ink-200 disabled:bg-ink-800 disabled:text-ink-600 disabled:cursor-not-allowed py-4 font-display font-bold tracking-tight uppercase text-base transition-all"
           >
             {generating ? (
               <span className="flex items-center justify-center gap-3">
@@ -457,7 +457,7 @@ function ToggleGrid<T extends string>({
               "px-3 py-2.5 text-xs font-mono uppercase tracking-wider transition-colors",
               active
                 ? "bg-ink-50 text-ink-950"
-                : "bg-ink-900/40 text-ink-400 hover:text-ink-100 hover:bg-ink-800/60",
+                : "bg-ink-900/40 text-ink-400 hover:text-ink-100 hover:bg-ink-800/30",
             ].join(" ")}
           >
             {opt.label}

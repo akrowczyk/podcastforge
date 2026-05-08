@@ -478,7 +478,7 @@ export default function TurnCard({
                     <button
                       onClick={handleRegenerate}
                       disabled={regenerating}
-                      className="flex-1 py-1.5 bg-ink-50 text-ink-950 font-mono text-[10px] uppercase tracking-widest font-bold hover:bg-white transition-colors disabled:opacity-50"
+                      className="flex-1 py-1.5 bg-ink-50 text-ink-950 font-mono text-[10px] uppercase tracking-widest font-bold hover:bg-ink-200 transition-colors disabled:opacity-50"
                     >
                       {regenerating ? "Regenerating…" : "Regenerate"}
                     </button>

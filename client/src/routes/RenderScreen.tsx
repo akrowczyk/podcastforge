@@ -269,7 +269,7 @@ export default function RenderScreen() {
                       "px-3 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors",
                       active
                         ? "bg-ink-50 text-ink-950"
-                        : "bg-ink-900/40 text-ink-400 hover:text-ink-100 hover:bg-ink-800/60",
+                        : "bg-ink-900/40 text-ink-400 hover:text-ink-100 hover:bg-ink-800/30",
                     ].join(" ")}
                   >
                     {q}
@@ -376,7 +376,7 @@ export default function RenderScreen() {
             <button
               onClick={handleRender}
               disabled={finalRenderState === "rendering"}
-              className="w-full bg-ink-50 text-ink-950 hover:bg-white disabled:bg-ink-800 disabled:text-ink-600 disabled:cursor-not-allowed py-4 font-display font-bold tracking-tight uppercase transition-colors"
+              className="w-full bg-ink-50 text-ink-950 hover:bg-ink-200 disabled:bg-ink-800 disabled:text-ink-600 disabled:cursor-not-allowed py-4 font-display font-bold tracking-tight uppercase transition-colors"
             >
               {finalRenderState === "done" ? "Re-render" : "Render Episode"}
             </button>
@@ -480,7 +480,7 @@ function CustomPlayer({ src }: { src: string }) {
       <audio ref={audioRef} src={src} />
       <button
         onClick={toggle}
-        className="w-8 h-8 flex items-center justify-center bg-ink-50 text-ink-950 hover:bg-white transition-colors"
+        className="w-8 h-8 flex items-center justify-center bg-ink-50 text-ink-950 hover:bg-ink-200 transition-colors"
       >
         {playing ? "⏸" : "▶"}
       </button>
