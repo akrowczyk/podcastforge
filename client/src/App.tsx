@@ -3,7 +3,9 @@ import { Route, Routes, NavLink, Link } from "react-router-dom";
 import SourceScreen from "./routes/SourceScreen";
 import EditorScreen from "./routes/EditorScreen";
 import RenderScreen from "./routes/RenderScreen";
+import NotFoundScreen from "./routes/NotFoundScreen";
 import HealthBadge from "./components/HealthBadge";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { useProject } from "./store/projectStore";
 
 export default function App() {
@@ -21,11 +23,14 @@ export default function App() {
     <div className="min-h-screen bg-ink-950 text-ink-50 flex flex-col">
       <Header />
       <main className="flex-1 flex flex-col">
-        <Routes>
-          <Route path="/" element={<SourceScreen />} />
-          <Route path="/editor" element={<EditorScreen />} />
-          <Route path="/render" element={<RenderScreen />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<SourceScreen />} />
+            <Route path="/editor" element={<EditorScreen />} />
+            <Route path="/render" element={<RenderScreen />} />
+            <Route path="*" element={<NotFoundScreen />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>

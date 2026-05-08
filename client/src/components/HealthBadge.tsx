@@ -6,15 +6,42 @@ interface Health {
   version: string;
 }
 
+const POLL_INTERVAL_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 3_000;
+
 export default function HealthBadge() {
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch(() => setError(true));
+    let cancelled = false;
+
+    async function poll() {
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+      try {
+        const r = await fetch("/api/health", { signal: ctrl.signal });
+        const data = (await r.json()) as Health;
+        if (cancelled) return;
+        setHealth(data);
+        setError(false);
+      } catch {
+        if (cancelled) return;
+        setError(true);
+        setHealth(null);
+      } finally {
+        clearTimeout(timeoutId);
+        if (!cancelled) setChecking(false);
+      }
+    }
+
+    poll();
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, []);
 
   let dotColor = "bg-ink-500";
@@ -30,6 +57,10 @@ export default function HealthBadge() {
       dotColor = "bg-amber-400";
       label = "no api key";
     }
+  } else if (!checking) {
+    // Lost state but not in error — fall back to neutral.
+    dotColor = "bg-ink-500";
+    label = "unknown";
   }
 
   return (
