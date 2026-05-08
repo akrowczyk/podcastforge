@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
+  DebugPrompts,
   LintWarning,
   ProjectConfig,
   Script,
@@ -32,8 +33,9 @@ interface ProjectState {
   // P2: Lint warnings from script generation
   lintWarnings: LintWarning[];
 
-  // P2: Debug prompt (what was sent to Grok)
-  debugPrompt: { system: string; user: string } | null;
+  // P2/P8: Debug prompts (what was sent to Grok). Pass 1 is the base
+  // generation prompt; pass 2 is the optional humanize prompt.
+  debugPrompts: DebugPrompts | null;
 
   // Per-turn render cache (keyed by turn id)
   turnRenders: Record<string, TurnRender>;
@@ -70,7 +72,7 @@ interface ProjectState {
   importProject: (json: string) => { ok: boolean; error?: string };
 
   setLintWarnings: (w: LintWarning[]) => void;
-  setDebugPrompt: (p: { system: string; user: string } | null) => void;
+  setDebugPrompts: (p: DebugPrompts | null) => void;
 
   setTurnRender: (id: string, render: Partial<TurnRender>) => void;
   clearTurnRenders: () => void;
@@ -94,8 +96,10 @@ const DEFAULT_CONFIG: ProjectConfig = {
   audience: "general",
   voices: { A: "eve", B: "ara", N: "leo" },
   audioQuality: "high",
-  pauseSpeakerSwitchMs: 350,
-  pauseSameSpeakerMs: 200,
+  // P8 — tight conversational pauses. The variable micro-turn override
+  // (~100ms) lives in render.ts; these are the substantive defaults.
+  pauseSpeakerSwitchMs: 130,
+  pauseSameSpeakerMs: 80,
 };
 
 function newTurnId(): string {
@@ -110,7 +114,7 @@ export const useProject = create<ProjectState>()(
       config: DEFAULT_CONFIG,
       script: null,
       lintWarnings: [],
-      debugPrompt: null,
+      debugPrompts: null,
       turnRenders: {},
       finalAudioUrl: null,
       finalRenderState: "idle",
@@ -301,7 +305,7 @@ export const useProject = create<ProjectState>()(
             finalAudioUrl: null,
             finalRenderState: "idle",
             lintWarnings: [],
-            debugPrompt: null,
+            debugPrompts: null,
           });
           return { ok: true };
         } catch (e) {
@@ -310,7 +314,7 @@ export const useProject = create<ProjectState>()(
       },
 
       setLintWarnings: (lintWarnings) => set({ lintWarnings }),
-      setDebugPrompt: (debugPrompt) => set({ debugPrompt }),
+      setDebugPrompts: (debugPrompts) => set({ debugPrompts }),
 
       setTurnRender: (id, render) =>
         set((s) => ({ turnRenders: { ...s.turnRenders, [id]: { ...s.turnRenders[id], ...render } } })),
@@ -330,7 +334,7 @@ export const useProject = create<ProjectState>()(
           config: DEFAULT_CONFIG,
           script: null,
           lintWarnings: [],
-          debugPrompt: null,
+          debugPrompts: null,
           turnRenders: {},
           finalAudioUrl: null,
           finalRenderState: "idle",

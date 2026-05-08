@@ -1,4 +1,4 @@
-import type { Turn, LintWarning } from "../../../shared/types.js";
+import type { Tone, Turn, LintWarning } from "../../../shared/types.js";
 
 // ===== Supported Grok TTS tags =====
 const INLINE_TAGS = new Set([
@@ -87,18 +87,26 @@ function countTags(text: string): {
 
 // ===== Lint a single turn =====
 
-function lintTurn(turn: Turn): LintWarning[] {
+function lintTurn(turn: Turn, tone: Tone): LintWarning[] {
   const warnings: LintWarning[] = [];
   const { total, inlineTags, wrapOpenTags, wrapCloseTags } = countTags(
     turn.text
   );
 
-  // P2.1a — Tag count
-  if (total > 3) {
+  // P2.1a / P8 — Tag count. Looser tones allow more tags, AND only flag
+  // when the turn is long enough that tags read as clutter rather than
+  // performance (a 4-word reaction turn like "[chuckle] Wait, [laugh]
+  // really?" is the entire point of the turn, not a smell).
+  const isLooseTone = tone === "casual" || tone === "energetic";
+  const cap = isLooseTone ? 5 : 3;
+  const isClutter = isLooseTone
+    ? total > cap && turn.text.length > 30
+    : total > cap;
+  if (isClutter) {
     warnings.push({
       turnId: turn.id,
       type: "tag-count",
-      message: `Turn has ${total} tags (max 3). Text: "${turn.text.slice(0, 80)}…"`,
+      message: `Turn has ${total} tags (max ${cap}). Text: "${turn.text.slice(0, 80)}…"`,
     });
   }
 
@@ -158,10 +166,10 @@ function lintTurn(turn: Turn): LintWarning[] {
 
 // ===== Lint an entire script =====
 
-export function lintScript(turns: Turn[]): LintWarning[] {
+export function lintScript(turns: Turn[], tone: Tone): LintWarning[] {
   const warnings: LintWarning[] = [];
   for (const turn of turns) {
-    warnings.push(...lintTurn(turn));
+    warnings.push(...lintTurn(turn, tone));
   }
   return warnings;
 }

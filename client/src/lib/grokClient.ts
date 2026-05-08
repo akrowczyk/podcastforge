@@ -1,7 +1,11 @@
 import type {
   AudioQuality,
+  DebugPromptPair,
+  DebugPrompts,
   GenerateScriptRequest,
   GenerateScriptResponse,
+  HumanizeScriptRequest,
+  HumanizeScriptResponse,
   LintWarning,
   ProjectConfig,
   RegenerateTurnRequest,
@@ -14,7 +18,7 @@ import type {
 export interface GenerateResult {
   script: Script;
   lintWarnings: LintWarning[];
-  debugPrompt?: { system: string; user: string };
+  debugPrompts?: DebugPrompts;
 }
 
 export async function generateScriptApi(args: {
@@ -35,8 +39,26 @@ export async function generateScriptApi(args: {
   return {
     script: data.script,
     lintWarnings: data.lintWarnings || [],
-    debugPrompt: data.debugPrompt,
+    debugPrompts: data.debugPrompts,
   };
+}
+
+export async function humanizeScriptApi(args: {
+  script: Script;
+  config: ProjectConfig;
+}): Promise<{ script: Script; debugPrompt: DebugPromptPair }> {
+  const body: HumanizeScriptRequest = args;
+  const res = await fetch("/api/humanize-script", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.details || err.error || "Humanize failed");
+  }
+  const data = (await res.json()) as HumanizeScriptResponse;
+  return { script: data.script, debugPrompt: data.debugPrompt };
 }
 
 export async function regenerateTurnApi(args: {

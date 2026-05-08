@@ -22,7 +22,7 @@ export default function SourceScreen() {
     patchConfig,
     setScript,
     setLintWarnings,
-    setDebugPrompt,
+    setDebugPrompts,
     importProject,
   } = useProject();
   const [generating, setGenerating] = useState(false);
@@ -48,7 +48,7 @@ export default function SourceScreen() {
       });
       setScript(result.script);
       setLintWarnings(result.lintWarnings);
-      setDebugPrompt(result.debugPrompt || null);
+      setDebugPrompts(result.debugPrompts || null);
       nav("/editor");
     } catch (e) {
       setError((e as Error).message);
@@ -347,7 +347,10 @@ export default function SourceScreen() {
             {generating ? (
               <span className="flex items-center justify-center gap-3">
                 <Spinner />
-                Generating script…
+                {config.mode === "two-host" &&
+                (config.tone === "casual" || config.tone === "energetic")
+                  ? "Writing + humanizing script (~60s)…"
+                  : "Generating script (~30s)…"}
               </span>
             ) : (
               <span className="flex items-center justify-center gap-3">

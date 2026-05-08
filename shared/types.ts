@@ -78,10 +78,30 @@ export interface GenerateScriptRequest {
   };
 }
 
+export interface DebugPromptPair {
+  system: string;
+  user: string;
+}
+
+export interface DebugPrompts {
+  pass1: DebugPromptPair;
+  pass2?: DebugPromptPair;
+}
+
 export interface GenerateScriptResponse {
   script: Script;
   lintWarnings?: LintWarning[];
-  debugPrompt?: { system: string; user: string };
+  debugPrompts?: DebugPrompts;
+}
+
+export interface HumanizeScriptRequest {
+  script: Script;
+  config: ProjectConfig;
+}
+
+export interface HumanizeScriptResponse {
+  script: Script;
+  debugPrompt: DebugPromptPair;
 }
 
 export interface RegenerateTurnRequest {

@@ -20,6 +20,7 @@ function getApiKey(): string {
 export async function generateScript(args: {
   systemPrompt: string;
   userMessage: string;
+  temperature?: number;
 }): Promise<Script> {
   const res = await fetch(`${XAI_BASE}/chat/completions`, {
     method: "POST",
@@ -34,7 +35,9 @@ export async function generateScript(args: {
         { role: "user", content: args.userMessage },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.85, // some creative looseness
+      // Default 0.85 for content (pass 1). Pass 2 humanize wants more
+      // spontaneity in word choice — callers can override.
+      temperature: args.temperature ?? 0.85,
     }),
     // 120s for long scripts on grok-4.3
     signal: AbortSignal.timeout(120_000),

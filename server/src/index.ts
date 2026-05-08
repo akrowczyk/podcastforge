@@ -4,6 +4,7 @@ import "dotenv/config";
 import pinoHttp from "pino-http";
 import { healthRouter } from "./routes/health.js";
 import { scriptRouter } from "./routes/generateScript.js";
+import { humanizeRouter } from "./routes/humanizeScript.js";
 import { ttsRouter } from "./routes/tts.js";
 import { regenerateRouter } from "./routes/regenerateTurn.js";
 import { tokenBucketLimiter } from "./lib/rateLimit.js";
@@ -44,6 +45,7 @@ const limiter = tokenBucketLimiter({ capacity: 60, refillPerSecond: 1 });
 
 app.use("/api/health", healthRouter);
 app.use("/api/generate-script", limiter, scriptRouter);
+app.use("/api/humanize-script", limiter, humanizeRouter);
 app.use("/api/tts", limiter, ttsRouter);
 app.use("/api/regenerate-turn", limiter, regenerateRouter);
 app.use("/api/fetch-url", limiter, fetchRouter);

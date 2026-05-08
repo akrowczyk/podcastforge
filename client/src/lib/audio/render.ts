@@ -89,15 +89,23 @@ export async function renderEpisode(args: RenderArgs): Promise<{
     trimmed.push({ turn, pcm: tight });
   }
 
-  // 3. Stitch with inter-turn pauses
+  // 3. Stitch with inter-turn pauses. P8 — micro-turns (≤5 words after
+  //    stripping speech tags) get a tight 100ms pause regardless of
+  //    speaker so reactions like "Right." or "[chuckle] Yeah." land as
+  //    interjections rather than polite turn-taking.
   const segments: Float32Array[] = [];
   for (let i = 0; i < trimmed.length; i++) {
     segments.push(trimmed[i].pcm);
     if (i < trimmed.length - 1) {
-      const same = trimmed[i].turn.speaker === trimmed[i + 1].turn.speaker;
-      const ms = same
-        ? config.pauseSameSpeakerMs
-        : config.pauseSpeakerSwitchMs;
+      const cur = trimmed[i].turn;
+      const nxt = trimmed[i + 1].turn;
+      const same = cur.speaker === nxt.speaker;
+      const ms =
+        isMicroTurn(cur) || isMicroTurn(nxt)
+          ? 100
+          : same
+            ? config.pauseSameSpeakerMs
+            : config.pauseSpeakerSwitchMs;
       segments.push(silence(ms, sampleRate));
     }
   }
@@ -111,6 +119,14 @@ export async function renderEpisode(args: RenderArgs): Promise<{
   const blob = await encodeMp3(merged, sampleRate, bitRateKbps);
   const url = URL.createObjectURL(blob);
   return { blob, url, durationSec };
+}
+
+// Strip speech tags ([inline] and <wrap>...</wrap>) and count words.
+// "[chuckle] Yeah." → 1 word, not 2.
+function isMicroTurn(turn: Turn): boolean {
+  const stripped = turn.text.replace(/\[[a-z-]+\]|<\/?[a-z-]+>/gi, "").trim();
+  if (!stripped) return true;
+  return stripped.split(/\s+/).filter(Boolean).length <= 5;
 }
 
 // Cheap hash for cache keys — not cryptographic, just for "did the text change"

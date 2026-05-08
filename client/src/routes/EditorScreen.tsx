@@ -3,7 +3,8 @@ import { useMemo, useState } from "react";
 import { useProject } from "../store/projectStore";
 import VoicePicker from "../components/VoicePicker";
 import TurnCard from "../components/TurnCard";
-import type { LintWarning, Speaker } from "@shared/types";
+import { humanizeScriptApi } from "../lib/grokClient";
+import type { DebugPromptPair, LintWarning, Speaker } from "@shared/types";
 
 export default function EditorScreen() {
   const nav = useNavigate();
@@ -13,7 +14,9 @@ export default function EditorScreen() {
     config,
     setVoice,
     lintWarnings,
-    debugPrompt,
+    debugPrompts,
+    setScript,
+    setDebugPrompts,
     insertTurn,
     duplicateTurn,
     deleteTurn,
@@ -24,6 +27,13 @@ export default function EditorScreen() {
 
   const showDebug = searchParams.get("debug") === "1";
   const [confirmSwap, setConfirmSwap] = useState(false);
+  const [confirmHumanize, setConfirmHumanize] = useState(false);
+  const [humanizing, setHumanizing] = useState(false);
+  const [humanizeError, setHumanizeError] = useState<string | null>(null);
+
+  const canHumanize =
+    config.mode === "two-host" &&
+    (config.tone === "casual" || config.tone === "energetic");
 
   if (!script) {
     return (
@@ -131,6 +141,25 @@ export default function EditorScreen() {
   function handleSwapAll() {
     swapAllSpeakers();
     setConfirmSwap(false);
+  }
+
+  async function handleHumanize() {
+    if (!script) return;
+    setConfirmHumanize(false);
+    setHumanizing(true);
+    setHumanizeError(null);
+    try {
+      const result = await humanizeScriptApi({ script, config });
+      setScript(result.script);
+      setDebugPrompts({
+        pass1: debugPrompts?.pass1 || { system: "", user: "" },
+        pass2: result.debugPrompt,
+      });
+    } catch (e) {
+      setHumanizeError((e as Error).message);
+    } finally {
+      setHumanizing(false);
+    }
   }
 
   // Figure out the default speaker for insert between turns
@@ -257,6 +286,49 @@ export default function EditorScreen() {
             </div>
           )}
 
+          {/* P8 — Re-humanize (casual/energetic two-host only) */}
+          {canHumanize && (
+            <div className="pt-2">
+              {humanizing ? (
+                <div className="w-full py-2 text-[10px] font-mono uppercase tracking-widest text-ink-400 border border-ink-700 text-center">
+                  Humanizing… (~30s)
+                </div>
+              ) : confirmHumanize ? (
+                <div className="border border-ink-700 bg-ink-900/60 p-3 space-y-2">
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-ink-400">
+                    Re-humanize? Every turn will be rewritten and all cached audio invalidated.
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleHumanize}
+                      className="flex-1 py-1.5 bg-ink-50 text-ink-950 font-mono text-[10px] uppercase tracking-widest font-bold hover:bg-ink-200 transition-colors"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setConfirmHumanize(false)}
+                      className="px-3 py-1.5 border border-ink-800 text-ink-400 font-mono text-[10px] uppercase tracking-widest hover:text-ink-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmHumanize(true)}
+                  className="w-full py-2 text-[10px] font-mono uppercase tracking-widest text-ink-500 border border-ink-800 hover:text-ink-200 hover:border-ink-600 transition-colors"
+                >
+                  ↻ Re-humanize script
+                </button>
+              )}
+              {humanizeError && (
+                <div className="mt-2 font-mono text-[10px] text-amber-400">
+                  {humanizeError}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="pt-4 border-t border-ink-800 space-y-2">
             <button
               onClick={() => nav("/render")}
@@ -284,10 +356,10 @@ export default function EditorScreen() {
           </div>
 
           {/* Debug prompt viewer — only shown with ?debug=1 */}
-          {showDebug && debugPrompt && (
-            <DebugPromptPanel
-              system={debugPrompt.system}
-              user={debugPrompt.user}
+          {showDebug && debugPrompts && (
+            <DebugPromptsPanel
+              pass1={debugPrompts.pass1}
+              pass2={debugPrompts.pass2}
             />
           )}
         </aside>
@@ -373,10 +445,40 @@ function LintBanner({ warnings }: { warnings: LintWarning[] }) {
   );
 }
 
-function DebugPromptPanel({
+function DebugPromptsPanel({
+  pass1,
+  pass2,
+}: {
+  pass1: DebugPromptPair;
+  pass2?: DebugPromptPair;
+}) {
+  return (
+    <div className="mt-4 pt-4 border-t border-ink-800 space-y-3">
+      <div className="font-mono text-[10px] uppercase tracking-widest text-ink-500">
+        Debug prompts
+      </div>
+      <DebugPromptSection
+        label={pass2 ? "Pass 1 — base script" : "Prompt"}
+        system={pass1.system}
+        user={pass1.user}
+      />
+      {pass2 && (
+        <DebugPromptSection
+          label="Pass 2 — humanize"
+          system={pass2.system}
+          user={pass2.user}
+        />
+      )}
+    </div>
+  );
+}
+
+function DebugPromptSection({
+  label,
   system,
   user,
 }: {
+  label: string;
   system: string;
   user: string;
 }) {
@@ -390,36 +492,34 @@ function DebugPromptPanel({
   }
 
   return (
-    <div className="mt-4 pt-4 border-t border-ink-800">
-      <details>
-        <summary className="font-mono text-[10px] uppercase tracking-widest text-ink-500 cursor-pointer hover:text-ink-300 transition-colors">
-          ▸ View prompt (debug)
-        </summary>
-        <div className="mt-3 space-y-3">
-          <div>
-            <div className="font-mono text-[9px] uppercase tracking-widest text-ink-600 mb-1">
-              System prompt
-            </div>
-            <pre className="text-[11px] font-mono text-ink-400 bg-ink-900/60 border border-ink-800 p-3 max-h-48 overflow-auto whitespace-pre-wrap leading-relaxed">
-              {system}
-            </pre>
+    <details>
+      <summary className="font-mono text-[10px] uppercase tracking-widest text-ink-500 cursor-pointer hover:text-ink-300 transition-colors">
+        ▸ {label}
+      </summary>
+      <div className="mt-3 space-y-3">
+        <div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ink-600 mb-1">
+            System prompt
           </div>
-          <div>
-            <div className="font-mono text-[9px] uppercase tracking-widest text-ink-600 mb-1">
-              User message
-            </div>
-            <pre className="text-[11px] font-mono text-ink-400 bg-ink-900/60 border border-ink-800 p-3 max-h-48 overflow-auto whitespace-pre-wrap leading-relaxed">
-              {user}
-            </pre>
-          </div>
-          <button
-            onClick={handleCopy}
-            className="w-full py-2 text-[10px] font-mono uppercase tracking-widest border border-ink-800 text-ink-400 hover:text-ink-50 hover:border-ink-50 transition-colors"
-          >
-            {copied ? "✓ Copied" : "Copy prompt"}
-          </button>
+          <pre className="text-[11px] font-mono text-ink-400 bg-ink-900/60 border border-ink-800 p-3 max-h-48 overflow-auto whitespace-pre-wrap leading-relaxed">
+            {system}
+          </pre>
         </div>
-      </details>
-    </div>
+        <div>
+          <div className="font-mono text-[9px] uppercase tracking-widest text-ink-600 mb-1">
+            User message
+          </div>
+          <pre className="text-[11px] font-mono text-ink-400 bg-ink-900/60 border border-ink-800 p-3 max-h-48 overflow-auto whitespace-pre-wrap leading-relaxed">
+            {user}
+          </pre>
+        </div>
+        <button
+          onClick={handleCopy}
+          className="w-full py-2 text-[10px] font-mono uppercase tracking-widest border border-ink-800 text-ink-400 hover:text-ink-50 hover:border-ink-50 transition-colors"
+        >
+          {copied ? "✓ Copied" : "Copy prompt"}
+        </button>
+      </div>
+    </details>
   );
 }
