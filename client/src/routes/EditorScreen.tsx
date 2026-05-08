@@ -87,16 +87,38 @@ export default function EditorScreen() {
     }));
   }
 
-  function handleExport() {
+  async function handleExport() {
     const json = exportProject();
     const slug = (script?.title || "project")
       .replace(/[^\w-]+/g, "_")
       .replace(/^_+|_+$/g, "");
+    const filename = `${slug}.podcastforge.json`;
     const blob = new Blob([json], { type: "application/json" });
+
+    if ("showSaveFilePicker" in window) {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: filename,
+          types: [
+            {
+              description: "PodcastForge Project JSON",
+              accept: { "application/json": [".json"] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+      }
+    }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${slug}.podcastforge.json`;
+    a.download = filename;
     a.style.display = "none";
     document.body.appendChild(a);
     a.click();

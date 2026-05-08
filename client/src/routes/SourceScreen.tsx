@@ -8,6 +8,8 @@ import type {
   Mode,
   Tone,
 } from "@shared/types";
+import { extractPdfText } from "../lib/extractPdf";
+import { extractDocxText } from "../lib/extractDocx";
 
 export default function SourceScreen() {
   const nav = useNavigate();
@@ -26,6 +28,12 @@ export default function SourceScreen() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<"paste" | "upload" | "url">("paste");
+  const [urlInput, setUrlInput] = useState("");
+  const [fetchingUrl, setFetchingUrl] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const charCount = sourceText.length;
   const canGenerate = sourceText.trim().length > 200 && !generating;
@@ -72,6 +80,62 @@ export default function SourceScreen() {
     if (importRef.current) importRef.current.value = "";
   }
 
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFile(true);
+    setUploadProgress(null);
+    setError(null);
+    try {
+      let text = "";
+      if (file.name.endsWith(".pdf")) {
+        text = await extractPdfText(file, setUploadProgress);
+      } else if (file.name.endsWith(".docx")) {
+        text = await extractDocxText(file);
+      } else if (file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+        text = await file.text();
+      } else {
+        throw new Error("Unsupported file type.");
+      }
+      setSourceText(text);
+      if (!sourceTitle) {
+        setSourceTitle(file.name.replace(/\.[^/.]+$/, ""));
+      }
+    } catch (err) {
+      setError(`Extraction failed: ${(err as Error).message}`);
+    } finally {
+      setUploadingFile(false);
+      setUploadProgress(null);
+    }
+    if (uploadRef.current) uploadRef.current.value = "";
+  }
+
+  async function handleUrlFetch() {
+    if (!urlInput) return;
+    setFetchingUrl(true);
+    setError(null);
+    try {
+      const res = await fetch("http://localhost:8787/api/fetch-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlInput }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setSourceText(data.text);
+      if (data.title && !sourceTitle) {
+        setSourceTitle(data.title);
+      }
+    } catch (err) {
+      setError(`Fetch failed: ${(err as Error).message}`);
+    } finally {
+      setFetchingUrl(false);
+    }
+  }
+
   return (
     <div className="max-w-[1400px] mx-auto px-6 lg:px-10 py-10 lg:py-16 w-full animate-fade-up">
       <Hero />
@@ -80,18 +144,118 @@ export default function SourceScreen() {
         {/* Left: source content */}
         <section>
           <SectionLabel index="01" label="Source Material" />
+          
+          <div className="flex items-center gap-1 mb-4 border-b border-ink-800">
+            {(["paste", "upload", "url"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={[
+                  "px-4 py-2 font-mono text-[10px] uppercase tracking-widest transition-colors border-b-2",
+                  tab === t
+                    ? "border-ink-50 text-ink-50"
+                    : "border-transparent text-ink-500 hover:text-ink-200"
+                ].join(" ")}
+              >
+                {t === "paste" ? "Paste Text" : t === "upload" ? "Upload File" : "URL"}
+              </button>
+            ))}
+          </div>
+
           <input
             value={sourceTitle}
             onChange={(e) => setSourceTitle(e.target.value)}
             placeholder="Episode title (optional)"
-            className="w-full bg-transparent border-0 border-b border-ink-700 focus:border-ink-50 outline-none py-3 text-2xl lg:text-3xl font-display font-semibold tracking-tighter placeholder:text-ink-700 transition-colors"
+            className="w-full bg-transparent border-0 border-b border-ink-800 focus:border-ink-50 outline-none py-3 text-2xl lg:text-3xl font-display font-semibold tracking-tighter placeholder:text-ink-700 transition-colors"
           />
-          <textarea
-            value={sourceText}
-            onChange={(e) => setSourceText(e.target.value)}
-            placeholder="Paste your source material here. Article, report, transcript, anything Grok can read. Aim for 1,000–50,000 characters for best results."
-            className="mt-6 w-full min-h-[460px] bg-ink-900/60 border border-ink-800 focus:border-ink-600 outline-none p-5 font-mono text-sm leading-relaxed text-ink-200 placeholder:text-ink-600 resize-vertical transition-colors"
-          />
+
+          {tab === "paste" && (
+            <textarea
+              value={sourceText}
+              onChange={(e) => setSourceText(e.target.value)}
+              placeholder="Paste your source material here. Article, report, transcript, anything Grok can read. Aim for 1,000–50,000 characters for best results."
+              className="mt-6 w-full min-h-[460px] bg-ink-900/60 border border-ink-800 focus:border-ink-600 outline-none p-5 font-mono text-sm leading-relaxed text-ink-200 placeholder:text-ink-600 resize-vertical transition-colors"
+            />
+          )}
+
+          {tab === "upload" && (
+            <div className="mt-6 w-full min-h-[460px] bg-ink-900/60 border border-ink-800 p-5 flex flex-col items-center justify-center text-center">
+              {uploadingFile ? (
+                <div className="space-y-4">
+                  <Spinner />
+                  <div className="font-mono text-xs text-ink-400">
+                    Extracting text… {uploadProgress !== null && `${uploadProgress}%`}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="font-mono text-xs text-ink-400 max-w-sm mx-auto">
+                    Upload a file to extract its text. Supported formats: .pdf, .docx, .txt, .md
+                  </div>
+                  <input
+                    ref={uploadRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt,.md"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => uploadRef.current?.click()}
+                    className="bg-ink-50 text-ink-950 px-6 py-3 font-display font-bold uppercase tracking-tight"
+                  >
+                    Select File
+                  </button>
+                </div>
+              )}
+              {sourceText && !uploadingFile && (
+                <div className="mt-8 text-left w-full max-h-[300px] overflow-y-auto font-mono text-xs text-ink-500 border-t border-ink-800 pt-4">
+                  <div className="text-ink-300 mb-2 font-bold">Extracted Preview:</div>
+                  {sourceText.slice(0, 1000)}...
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === "url" && (
+            <div className="mt-6 w-full min-h-[460px] bg-ink-900/60 border border-ink-800 p-5 flex flex-col items-center justify-center text-center">
+              {fetchingUrl ? (
+                <div className="space-y-4">
+                  <Spinner />
+                  <div className="font-mono text-xs text-ink-400">Fetching and parsing URL…</div>
+                </div>
+              ) : (
+                <div className="w-full max-w-lg space-y-4">
+                  <div className="font-mono text-xs text-ink-400">
+                    Paste a URL to extract its main article content.
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      placeholder="https://..."
+                      className="flex-1 bg-transparent border border-ink-700 focus:border-ink-50 outline-none px-4 py-3 font-mono text-sm text-ink-200 placeholder:text-ink-700 transition-colors"
+                      onKeyDown={(e) => e.key === "Enter" && handleUrlFetch()}
+                    />
+                    <button
+                      onClick={handleUrlFetch}
+                      disabled={!urlInput}
+                      className="bg-ink-50 text-ink-950 px-6 py-3 font-display font-bold uppercase tracking-tight disabled:bg-ink-800 disabled:text-ink-600"
+                    >
+                      Fetch
+                    </button>
+                  </div>
+                </div>
+              )}
+              {sourceText && !fetchingUrl && (
+                <div className="mt-8 text-left w-full max-h-[250px] overflow-y-auto font-mono text-xs text-ink-500 border-t border-ink-800 pt-4">
+                  <div className="text-ink-300 mb-2 font-bold">Extracted Preview:</div>
+                  {sourceText.slice(0, 1000)}...
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between mt-3 font-mono text-[11px] uppercase tracking-widest text-ink-500">
             <span>{charCount.toLocaleString()} chars</span>
             <span>

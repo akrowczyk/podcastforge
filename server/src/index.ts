@@ -7,6 +7,8 @@ import { ttsRouter } from "./routes/tts.js";
 import { regenerateRouter } from "./routes/regenerateTurn.js";
 import { tokenBucketLimiter } from "./lib/rateLimit.js";
 
+import { fetchRouter } from "./routes/fetchUrl.js";
+
 const app = express();
 const PORT = Number(process.env.PORT) || 8787;
 
@@ -20,6 +22,7 @@ app.use("/api/health", healthRouter);
 app.use("/api/generate-script", limiter, scriptRouter);
 app.use("/api/tts", limiter, ttsRouter);
 app.use("/api/regenerate-turn", limiter, regenerateRouter);
+app.use("/api/fetch-url", limiter, fetchRouter);
 
 app.listen(PORT, () => {
   console.log(`PodcastForge server listening on http://localhost:${PORT}`);
