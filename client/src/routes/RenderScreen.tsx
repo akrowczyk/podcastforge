@@ -258,7 +258,7 @@ export default function RenderScreen() {
             <div className="font-mono text-[11px] uppercase tracking-widest text-ink-500 mb-2">
               Audio Quality
             </div>
-            <div className="grid grid-cols-3 gap-px bg-ink-800">
+            <div className="grid grid-cols-3 gap-px bg-ink-800 border border-ink-800">
               {(["standard", "high", "studio"] as AudioQuality[]).map((q) => {
                 const active = config.audioQuality === q;
                 return (
@@ -269,7 +269,7 @@ export default function RenderScreen() {
                       "px-3 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors",
                       active
                         ? "bg-ink-50 text-ink-950"
-                        : "bg-ink-950 text-ink-400 hover:text-ink-100 hover:bg-ink-900",
+                        : "bg-ink-900/40 text-ink-400 hover:text-ink-100 hover:bg-ink-800/60",
                     ].join(" ")}
                   >
                     {q}

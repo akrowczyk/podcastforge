@@ -45,7 +45,7 @@ export default function VoicePicker({
                 "py-2 text-[10px] font-mono uppercase tracking-widest transition-colors",
                 active
                   ? "bg-ink-50 text-ink-950"
-                  : "bg-ink-950 text-ink-500 hover:text-ink-100",
+                  : "bg-ink-900/40 text-ink-400 hover:text-ink-100 hover:bg-ink-800/60",
               ].join(" ")}
             >
               {v}
