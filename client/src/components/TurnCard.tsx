@@ -93,8 +93,11 @@ export default function TurnCard({
   const [showVoicePicker, setShowVoicePicker] = useState(false);
 
   const render = turnRenders[turn.id];
-  const speakerLabel =
-    turn.speaker === "A" ? "EVE" : turn.speaker === "B" ? "ARA" : "NARRATOR";
+
+  // Resolve the effective voice for this turn
+  const effectiveVoice = turn.voiceOverride
+    || (turn.speaker === "A" ? config.voices.A : turn.speaker === "B" ? (config.voices.B || config.voices.A) : (config.voices.N || config.voices.A));
+  const speakerLabel = VOICE_INFO[effectiveVoice as BuiltInVoice]?.label || effectiveVoice.toUpperCase();
   const speakerLetter =
     turn.speaker === "A" ? "A" : turn.speaker === "B" ? "B" : "N";
 
@@ -209,9 +212,7 @@ export default function TurnCard({
     (w) => w.type === "banned-phrase"
   );
 
-  const overrideLabel = turn.voiceOverride
-    ? VOICE_INFO[turn.voiceOverride as BuiltInVoice]?.label || turn.voiceOverride
-    : null;
+
 
   return (
     <div
@@ -274,12 +275,7 @@ export default function TurnCard({
             {speakerLabel}
           </div>
           <div className="font-mono text-[9px] text-ink-700">#{index + 1}</div>
-          {/* Voice override badge */}
-          {overrideLabel && (
-            <div className="font-mono text-[8px] uppercase tracking-wider text-amber-400 mt-0.5">
-              {overrideLabel}
-            </div>
-          )}
+
         </button>
 
         {/* Text + toolbar column */}

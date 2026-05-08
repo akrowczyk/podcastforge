@@ -14,6 +14,8 @@ interface TurnRender {
   state: "idle" | "rendering" | "done" | "failed";
   audioBlobUrl?: string;
   error?: string;
+  startedAt?: number;
+  completedAt?: number;
 }
 
 interface ProjectState {
@@ -70,7 +72,7 @@ interface ProjectState {
   setLintWarnings: (w: LintWarning[]) => void;
   setDebugPrompt: (p: { system: string; user: string } | null) => void;
 
-  setTurnRender: (id: string, render: TurnRender) => void;
+  setTurnRender: (id: string, render: Partial<TurnRender>) => void;
   clearTurnRenders: () => void;
 
   setFinalAudio: (url: string | null) => void;
@@ -307,7 +309,7 @@ export const useProject = create<ProjectState>()(
       setDebugPrompt: (debugPrompt) => set({ debugPrompt }),
 
       setTurnRender: (id, render) =>
-        set((s) => ({ turnRenders: { ...s.turnRenders, [id]: render } })),
+        set((s) => ({ turnRenders: { ...s.turnRenders, [id]: { ...s.turnRenders[id], ...render } } })),
 
       clearTurnRenders: () => set({ turnRenders: {} }),
 

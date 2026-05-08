@@ -19,6 +19,7 @@ export default function RenderScreen() {
     setFinalRenderState,
   } = useProject();
   const [progressLine, setProgressLine] = useState<string>("");
+  const [etaSec, setEtaSec] = useState<number | null>(null);
   const cacheRef = useRef<Map<string, ArrayBuffer>>(new Map());
   const finalBlobRef = useRef<Blob | null>(null);
 
@@ -50,17 +51,33 @@ export default function RenderScreen() {
     setFinalRenderState("rendering");
     setProgressLine("Synthesizing turns…");
     try {
+
       const result = await renderEpisode({
         script,
         config,
         cache: cacheRef.current,
         callbacks: {
           onTurnStart: (id) => {
-            setTurnRender(id, { state: "rendering" });
+            const current = useProject.getState().turnRenders[id];
+            if (current?.state === "done") return; // Skip UI update if cached
+            setTurnRender(id, { state: "rendering", startedAt: Date.now() });
             setProgressLine(`Synthesizing turn ${id}…`);
           },
           onTurnDone: (id, url) => {
-            setTurnRender(id, { state: "done", audioBlobUrl: url });
+            const current = useProject.getState().turnRenders[id];
+            // Only set completedAt if it wasn't already done
+            const completedAt = current?.state === "done" ? current.completedAt : Date.now();
+            setTurnRender(id, { state: "done", audioBlobUrl: url, completedAt });
+            
+            // ETA Calculation
+            const renders = Object.values(useProject.getState().turnRenders);
+            const doneRenders = renders.filter(r => r.state === "done" && r.startedAt && r.completedAt);
+            if (doneRenders.length >= 2) {
+              const totalDuration = doneRenders.reduce((acc, r) => acc + (r.completedAt! - r.startedAt!), 0);
+              const avg = totalDuration / doneRenders.length;
+              const remaining = script.turns.length - renders.filter(r => r.state === "done").length;
+              setEtaSec(Math.round((avg * remaining) / 1000));
+            }
           },
           onTurnError: (id, err) => {
             setTurnRender(id, { state: "failed", error: err });
@@ -68,19 +85,23 @@ export default function RenderScreen() {
         },
       });
       setProgressLine("Stitching and encoding MP3…");
+      setEtaSec(null);
       finalBlobRef.current = result.blob;
       setFinalAudio(result.url);
       setFinalRenderState("done");
+      
+      const mins = Math.floor(result.durationSec / 60);
+      const secs = Math.floor(result.durationSec % 60);
+      const formattedTime = `${mins}:${secs.toString().padStart(2, "0")}`;
+      const qualityText = config.audioQuality === "standard" ? "standard (24kHz)" : config.audioQuality === "high" ? "high (44.1kHz)" : "studio (48kHz)";
+      
       setProgressLine(
-        `Done · ${Math.round(result.durationSec / 6) / 10} min · ${(
-          result.blob.size /
-          1024 /
-          1024
-        ).toFixed(2)} MB`
+        `${formattedTime} · ${(result.blob.size / 1024 / 1024).toFixed(2)} MB · ${qualityText}`
       );
     } catch (e) {
       setFinalRenderState("failed", (e as Error).message);
       setProgressLine("");
+      setEtaSec(null);
     }
   }
 
@@ -90,11 +111,14 @@ export default function RenderScreen() {
     const downloadBlob = blob || (finalAudioUrl ? await fetch(finalAudioUrl).then(r => r.blob()) : null);
     if (!downloadBlob || !script) return;
 
-    const slug = (script.title || "PodcastForge_episode")
-      .replace(/[^\w-]+/g, "_")
-      .replace(/^_+|_+$/g, "");
-    const date = new Date().toISOString().slice(0, 10);
-    const filename = `${slug}_${date}.mp3`;
+    let slug = "PodcastForge";
+    if (script.title) {
+      slug = script.title.replace(/[^\w-]+/g, "_").replace(/^_+|_+$/g, "");
+    }
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const time = `${now.getHours().toString().padStart(2, "0")}${now.getMinutes().toString().padStart(2, "0")}`;
+    const filename = script.title ? `${slug}_${date}.mp3` : `${slug}_${date}_${time}.mp3`;
 
     // Try modern File System Access API first (shows native Save dialog)
     if ("showSaveFilePicker" in window) {
@@ -134,7 +158,14 @@ export default function RenderScreen() {
   }
 
   function handleRetryFailed() {
-    // For P0/P1 we just re-run the whole render; P3 will add per-turn retry
+    handleRender();
+  }
+
+  function handleRetryTurn(id: string) {
+    // Clear the specific error state so we can retry it
+    setTurnRender(id, { state: "idle", error: undefined });
+    // Run the whole render. Thanks to cache, this will quickly fly through
+    // done turns and only synthesize the idle/failed ones.
     handleRender();
   }
 
@@ -190,7 +221,31 @@ export default function RenderScreen() {
                     {turn.text.slice(0, 100)}
                     {turn.text.length > 100 ? "…" : ""}
                   </span>
-                  <StateBadge state={state} error={r?.error} />
+                  
+                  <div className="flex items-center gap-4">
+                    {r?.state === "done" && r?.audioBlobUrl && (
+                      <button
+                        onClick={() => {
+                          const a = new Audio(r.audioBlobUrl);
+                          a.play();
+                        }}
+                        className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors"
+                      >
+                        ▶ Preview
+                      </button>
+                    )}
+                    
+                    {r?.state === "failed" && (
+                      <button
+                        onClick={() => handleRetryTurn(turn.id)}
+                        className="text-[10px] font-mono uppercase tracking-widest text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        ↻ Retry
+                      </button>
+                    )}
+
+                    <StateBadge state={state} error={r?.error} />
+                  </div>
                 </div>
               );
             })}
@@ -275,8 +330,9 @@ export default function RenderScreen() {
 
           {finalRenderState === "rendering" && (
             <div className="border border-ink-800 bg-ink-900/40 p-3">
-              <div className="font-mono text-[10px] uppercase tracking-widest text-ink-500 mb-2">
-                Rendering…
+              <div className="font-mono text-[10px] uppercase tracking-widest text-ink-500 mb-2 flex justify-between">
+                <span>Rendering…</span>
+                {etaSec !== null && <span>ETA: {etaSec < 60 ? `${etaSec}s` : `${Math.floor(etaSec / 60)}m ${etaSec % 60}s`}</span>}
               </div>
               <div className="font-mono text-xs text-ink-300">
                 {progressLine}
