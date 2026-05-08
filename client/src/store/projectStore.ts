@@ -94,8 +94,8 @@ const DEFAULT_CONFIG: ProjectConfig = {
   audience: "general",
   voices: { A: "eve", B: "ara", N: "leo" },
   audioQuality: "high",
-  pauseSpeakerSwitchMs: 250,
-  pauseSameSpeakerMs: 150,
+  pauseSpeakerSwitchMs: 350,
+  pauseSameSpeakerMs: 200,
 };
 
 function newTurnId(): string {

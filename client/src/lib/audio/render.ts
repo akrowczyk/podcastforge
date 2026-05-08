@@ -85,7 +85,7 @@ export async function renderEpisode(args: RenderArgs): Promise<{
   const trimmed: { turn: Turn; pcm: Float32Array }[] = [];
   for (const { turn, bytes } of turnAudio) {
     const pcm = await decodeMp3ToMono(bytes, sampleRate);
-    const tight = trimTrailingSilence(pcm, -50, 30, sampleRate);
+    const tight = trimTrailingSilence(pcm, -45, 30, sampleRate);
     trimmed.push({ turn, pcm: tight });
   }
 
