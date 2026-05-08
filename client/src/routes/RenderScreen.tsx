@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useProject } from "../store/projectStore";
 import { renderEpisode } from "../lib/audio/render";
 import type { AudioQuality } from "@shared/types";
@@ -344,11 +344,11 @@ export default function RenderScreen() {
           )}
 
           {finalRenderState === "done" && finalAudioUrl && (
-            <div className="border border-emerald-900 bg-emerald-950/30 p-4 space-y-3">
-              <div className="font-mono text-[10px] uppercase tracking-widest text-emerald-300">
-                Render complete
+            <div className="border border-ink-800 bg-ink-900/40 p-4 space-y-3">
+              <div className="font-mono text-[10px] uppercase tracking-widest text-ink-400 flex items-center gap-2">
+                <span className="text-emerald-500">●</span> Render complete
               </div>
-              <audio controls src={finalAudioUrl} className="w-full" />
+              <CustomPlayer src={finalAudioUrl} />
               <div className="font-mono text-[10px] text-ink-500">
                 {progressLine}
               </div>
@@ -434,5 +434,74 @@ function StateBadge({
     >
       ● failed
     </span>
+  );
+}
+
+function CustomPlayer({ src }: { src: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const updateTime = () => setProgress(a.currentTime);
+    const updateDuration = () => setDuration(a.duration);
+    const onEnded = () => setPlaying(false);
+    
+    a.addEventListener("timeupdate", updateTime);
+    a.addEventListener("loadedmetadata", updateDuration);
+    a.addEventListener("ended", onEnded);
+    return () => {
+      a.removeEventListener("timeupdate", updateTime);
+      a.removeEventListener("loadedmetadata", updateDuration);
+      a.removeEventListener("ended", onEnded);
+    };
+  }, []);
+
+  const toggle = () => {
+    if (audioRef.current) {
+      if (playing) audioRef.current.pause();
+      else audioRef.current.play();
+      setPlaying(!playing);
+    }
+  };
+
+  const format = (t: number) => {
+    if (isNaN(t)) return "0:00";
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="flex items-center gap-3 border border-ink-800 bg-ink-950 p-2">
+      <audio ref={audioRef} src={src} />
+      <button
+        onClick={toggle}
+        className="w-8 h-8 flex items-center justify-center bg-ink-50 text-ink-950 hover:bg-white transition-colors"
+      >
+        {playing ? "⏸" : "▶"}
+      </button>
+      <div className="font-mono text-[10px] text-ink-300 w-10">{format(progress)}</div>
+      <div
+        className="flex-1 h-1.5 bg-ink-800 relative cursor-pointer"
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const pct = (e.clientX - rect.left) / rect.width;
+          if (audioRef.current && duration) {
+            audioRef.current.currentTime = pct * duration;
+            setProgress(pct * duration);
+          }
+        }}
+      >
+        <div
+          className="absolute left-0 top-0 bottom-0 bg-ink-200"
+          style={{ width: `${duration ? (progress / duration) * 100 : 0}%` }}
+        />
+      </div>
+      <div className="font-mono text-[10px] text-ink-500 w-10 text-right">{format(duration)}</div>
+    </div>
   );
 }
