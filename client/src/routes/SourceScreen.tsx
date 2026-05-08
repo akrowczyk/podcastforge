@@ -446,7 +446,7 @@ function ToggleGrid<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-px bg-ink-800">
+    <div className="grid grid-cols-2 gap-px bg-ink-800 border border-ink-800">
       {options.map((opt) => {
         const active = opt.value === value;
         return (
@@ -457,7 +457,7 @@ function ToggleGrid<T extends string>({
               "px-3 py-2.5 text-xs font-mono uppercase tracking-wider transition-colors",
               active
                 ? "bg-ink-50 text-ink-950"
-                : "bg-ink-950 text-ink-400 hover:text-ink-100 hover:bg-ink-900",
+                : "bg-ink-900/40 text-ink-400 hover:text-ink-100 hover:bg-ink-800/60",
             ].join(" ")}
           >
             {opt.label}
