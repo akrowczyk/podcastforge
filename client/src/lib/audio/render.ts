@@ -105,8 +105,10 @@ export async function renderEpisode(args: RenderArgs): Promise<{
   const merged = concatMono(segments);
   const durationSec = merged.length / sampleRate;
 
-  // 4. Encode merged stream to MP3
-  const blob = encodeMp3(merged, sampleRate, bitRateKbps);
+  // 4. Encode merged stream to MP3 (in a Web Worker so the main thread
+  //    stays responsive). The merged buffer is transferred to the worker;
+  //    we already captured durationSec above so we don't need it after.
+  const blob = await encodeMp3(merged, sampleRate, bitRateKbps);
   const url = URL.createObjectURL(blob);
   return { blob, url, durationSec };
 }

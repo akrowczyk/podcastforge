@@ -1,35 +1,42 @@
-import lamejs from "@breezystack/lamejs";
+import EncodeWorker from "./encodeWorker?worker";
+import { encodeMp3Buffer } from "./encodeMp3Core";
 
-// Encode a mono Float32 PCM array as MP3.
-// Returns a Blob URL the browser can play / download.
+interface EncodeResponse {
+  ok: boolean;
+  bytes?: Uint8Array;
+  error?: string;
+}
+
+// Async MP3 encode. Runs lamejs in a Web Worker so the main thread stays
+// responsive during the multi-second encode pass on long episodes.
+//
+// The pcm buffer is transferred to the worker — the caller MUST NOT reuse it
+// after this call.
 export function encodeMp3(
   monoPcm: Float32Array,
   sampleRate: number,
   bitRateKbps: number
-): Blob {
-  // lamejs wants 16-bit signed PCM
-  const samples = floatToInt16(monoPcm);
-
-  // Channels=1, sampleRate, bitrate kbps
-  const encoder = new lamejs.Mp3Encoder(1, sampleRate, bitRateKbps);
-  const chunkSize = 1152;
-  const mp3Chunks: Uint8Array[] = [];
-  for (let i = 0; i < samples.length; i += chunkSize) {
-    const chunk = samples.subarray(i, i + chunkSize);
-    const mp3buf = encoder.encodeBuffer(chunk);
-    if (mp3buf.length > 0) mp3Chunks.push(mp3buf);
-  }
-  const flush = encoder.flush();
-  if (flush.length > 0) mp3Chunks.push(flush);
-
-  return new Blob(mp3Chunks as BlobPart[], { type: "audio/mpeg" });
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const worker = new EncodeWorker();
+    worker.onmessage = (e: MessageEvent<EncodeResponse>) => {
+      worker.terminate();
+      if (e.data.ok && e.data.bytes) {
+        resolve(new Blob([e.data.bytes as BlobPart], { type: "audio/mpeg" }));
+      } else {
+        reject(new Error(e.data.error || "Encode worker returned no data"));
+      }
+    };
+    worker.onerror = (e) => {
+      worker.terminate();
+      reject(new Error(e.message || "Encode worker errored"));
+    };
+    worker.postMessage(
+      { pcm: monoPcm, sampleRate, bitRateKbps },
+      [monoPcm.buffer as ArrayBuffer]
+    );
+  });
 }
 
-function floatToInt16(input: Float32Array): Int16Array {
-  const out = new Int16Array(input.length);
-  for (let i = 0; i < input.length; i++) {
-    const s = Math.max(-1, Math.min(1, input[i]));
-    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-  }
-  return out;
-}
+// Re-export the sync core for callers that explicitly need it (e.g. tests).
+export { encodeMp3Buffer };
