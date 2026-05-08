@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
+  LintWarning,
   ProjectConfig,
   Script,
   Turn,
@@ -24,6 +25,12 @@ interface ProjectState {
   // Generated
   script: Script | null;
 
+  // P2: Lint warnings from script generation
+  lintWarnings: LintWarning[];
+
+  // P2: Debug prompt (what was sent to Grok)
+  debugPrompt: { system: string; user: string } | null;
+
   // Per-turn render cache (keyed by turn id)
   turnRenders: Record<string, TurnRender>;
 
@@ -40,6 +47,10 @@ interface ProjectState {
 
   setScript: (s: Script | null) => void;
   updateTurnText: (id: string, text: string) => void;
+  replaceTurn: (id: string, turn: Turn) => void;
+
+  setLintWarnings: (w: LintWarning[]) => void;
+  setDebugPrompt: (p: { system: string; user: string } | null) => void;
 
   setTurnRender: (id: string, render: TurnRender) => void;
   clearTurnRenders: () => void;
@@ -71,6 +82,8 @@ export const useProject = create<ProjectState>()(
       sourceText: "",
       config: DEFAULT_CONFIG,
       script: null,
+      lintWarnings: [],
+      debugPrompt: null,
       turnRenders: {},
       finalAudioUrl: null,
       finalRenderState: "idle",
@@ -104,6 +117,26 @@ export const useProject = create<ProjectState>()(
           };
         }),
 
+      replaceTurn: (id, turn) =>
+        set((s) => {
+          if (!s.script) return {};
+          const turns: Turn[] = s.script.turns.map((t) =>
+            t.id === id ? { ...turn, id } : t
+          );
+          // Invalidate cached audio for this turn
+          const newRenders = { ...s.turnRenders };
+          delete newRenders[id];
+          return {
+            script: { ...s.script, turns },
+            turnRenders: newRenders,
+            finalAudioUrl: null,
+            finalRenderState: "idle",
+          };
+        }),
+
+      setLintWarnings: (lintWarnings) => set({ lintWarnings }),
+      setDebugPrompt: (debugPrompt) => set({ debugPrompt }),
+
       setTurnRender: (id, render) =>
         set((s) => ({ turnRenders: { ...s.turnRenders, [id]: render } })),
 
@@ -119,6 +152,8 @@ export const useProject = create<ProjectState>()(
           sourceText: "",
           config: DEFAULT_CONFIG,
           script: null,
+          lintWarnings: [],
+          debugPrompt: null,
           turnRenders: {},
           finalAudioUrl: null,
           finalRenderState: "idle",

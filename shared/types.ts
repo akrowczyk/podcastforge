@@ -61,6 +61,13 @@ export interface ProjectConfig {
   pauseSameSpeakerMs: number;
 }
 
+// ===== Script linting =====
+export interface LintWarning {
+  turnId: string;
+  type: "tag-count" | "unclosed-tag" | "unknown-tag" | "banned-phrase";
+  message: string;
+}
+
 // ===== API contracts =====
 export interface GenerateScriptRequest {
   config: ProjectConfig;
@@ -72,6 +79,20 @@ export interface GenerateScriptRequest {
 
 export interface GenerateScriptResponse {
   script: Script;
+  lintWarnings?: LintWarning[];
+  debugPrompt?: { system: string; user: string };
+}
+
+export interface RegenerateTurnRequest {
+  turn: Turn;
+  precedingTurns: Turn[];
+  followingTurns: Turn[];
+  hint?: string;
+  config: ProjectConfig;
+}
+
+export interface RegenerateTurnResponse {
+  turn: Turn;
 }
 
 export interface TtsRequest {

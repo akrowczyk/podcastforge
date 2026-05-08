@@ -4,6 +4,7 @@ import "dotenv/config";
 import { healthRouter } from "./routes/health.js";
 import { scriptRouter } from "./routes/generateScript.js";
 import { ttsRouter } from "./routes/tts.js";
+import { regenerateRouter } from "./routes/regenerateTurn.js";
 import { tokenBucketLimiter } from "./lib/rateLimit.js";
 
 const app = express();
@@ -18,6 +19,7 @@ const limiter = tokenBucketLimiter({ capacity: 60, refillPerSecond: 1 });
 app.use("/api/health", healthRouter);
 app.use("/api/generate-script", limiter, scriptRouter);
 app.use("/api/tts", limiter, ttsRouter);
+app.use("/api/regenerate-turn", limiter, regenerateRouter);
 
 app.listen(PORT, () => {
   console.log(`PodcastForge server listening on http://localhost:${PORT}`);

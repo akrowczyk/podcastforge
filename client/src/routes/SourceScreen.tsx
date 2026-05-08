@@ -19,6 +19,8 @@ export default function SourceScreen() {
     setSourceText,
     patchConfig,
     setScript,
+    setLintWarnings,
+    setDebugPrompt,
   } = useProject();
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,11 +32,13 @@ export default function SourceScreen() {
     setGenerating(true);
     setError(null);
     try {
-      const script = await generateScriptApi({
+      const result = await generateScriptApi({
         config,
         source: { title: sourceTitle, rawText: sourceText },
       });
-      setScript(script);
+      setScript(result.script);
+      setLintWarnings(result.lintWarnings);
+      setDebugPrompt(result.debugPrompt || null);
       nav("/editor");
     } catch (e) {
       setError((e as Error).message);

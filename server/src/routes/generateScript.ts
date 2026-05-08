@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { generateScript } from "../lib/xaiClient.js";
 import { buildSystemPrompt, buildUserMessage } from "../prompts/builder.js";
+import { lintScript } from "../lib/scriptLinter.js";
 import type { GenerateScriptRequest } from "../../../shared/types.js";
 
 export const scriptRouter = Router();
@@ -36,7 +37,20 @@ scriptRouter.post("/", async (req, res) => {
       }));
     }
 
-    res.json({ script });
+    // P2.1/P2.2 — Lint the script for tag issues and banned phrases
+    const lintWarnings = lintScript(script.turns);
+    if (lintWarnings.length > 0) {
+      console.warn(
+        `[script-lint] ${lintWarnings.length} warning(s):`,
+        lintWarnings.map((w) => w.message).join(" | ")
+      );
+    }
+
+    res.json({
+      script,
+      lintWarnings,
+      debugPrompt: { system: systemPrompt, user: userMessage },
+    });
   } catch (e) {
     const msg = (e as Error).message;
     console.error("[generate-script]", msg);
