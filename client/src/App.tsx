@@ -1,10 +1,22 @@
+import { useEffect } from "react";
 import { Route, Routes, NavLink, Link } from "react-router-dom";
 import SourceScreen from "./routes/SourceScreen";
 import EditorScreen from "./routes/EditorScreen";
 import RenderScreen from "./routes/RenderScreen";
 import HealthBadge from "./components/HealthBadge";
+import { useProject } from "./store/projectStore";
 
 export default function App() {
+  const { theme } = useProject();
+
+  useEffect(() => {
+    if (theme === "light") {
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+  }, [theme]);
+
   return (
     <div className="min-h-screen bg-ink-950 text-ink-50 flex flex-col">
       <Header />
@@ -21,6 +33,7 @@ export default function App() {
 }
 
 function Header() {
+  const { theme, toggleTheme } = useProject();
   return (
     <header className="border-b border-ink-800 bg-ink-950/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-10 h-16 flex items-center justify-between">
@@ -40,7 +53,16 @@ function Header() {
           <Tab to="/editor" label="02 · Script" />
           <Tab to="/render" label="03 · Render" />
         </nav>
-        <HealthBadge />
+        <div className="flex items-center gap-4">
+          <button
+            onClick={toggleTheme}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-ink-900 border border-ink-800 text-ink-400 hover:text-ink-50 transition-colors"
+            title="Toggle theme"
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+          <HealthBadge />
+        </div>
       </div>
     </header>
   );

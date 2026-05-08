@@ -81,6 +81,9 @@ interface ProjectState {
     error?: string
   ) => void;
 
+  theme: "dark" | "light";
+  toggleTheme: () => void;
+
   resetProject: () => void;
 }
 
@@ -111,6 +114,7 @@ export const useProject = create<ProjectState>()(
       turnRenders: {},
       finalAudioUrl: null,
       finalRenderState: "idle",
+      theme: "dark",
 
       setSourceTitle: (t) => set({ sourceTitle: t }),
       setSourceText: (t) => set({ sourceText: t }),
@@ -317,6 +321,8 @@ export const useProject = create<ProjectState>()(
       setFinalRenderState: (state, error) =>
         set({ finalRenderState: state, finalRenderError: error }),
 
+      toggleTheme: () => set((s) => ({ theme: s.theme === "dark" ? "light" : "dark" })),
+
       resetProject: () =>
         set({
           sourceTitle: "",
@@ -339,6 +345,7 @@ export const useProject = create<ProjectState>()(
         sourceText: state.sourceText,
         config: state.config,
         script: state.script,
+        theme: state.theme,
       }),
     }
   )

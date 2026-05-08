@@ -6,18 +6,18 @@ export default {
       colors: {
         // Pure monochrome scale — Grok-style
         ink: {
-          0: "#FFFFFF",
-          50: "#FAFAFA",
-          100: "#F4F4F4",
-          200: "#E5E5E5",
-          300: "#D4D4D4",
-          400: "#A3A3A3",
-          500: "#737373",
-          600: "#525252",
-          700: "#404040",
-          800: "#262626",
-          900: "#171717",
-          950: "#0A0A0A",
+          0: "var(--color-ink-0)",
+          50: "var(--color-ink-50)",
+          100: "var(--color-ink-100)",
+          200: "var(--color-ink-200)",
+          300: "var(--color-ink-300)",
+          400: "var(--color-ink-400)",
+          500: "var(--color-ink-500)",
+          600: "var(--color-ink-600)",
+          700: "var(--color-ink-700)",
+          800: "var(--color-ink-800)",
+          900: "var(--color-ink-900)",
+          950: "var(--color-ink-950)",
         },
         // Subtle accent for active states
         signal: "#FF3B00", // sharp orange-red, used VERY sparingly
